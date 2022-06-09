@@ -1,7 +1,7 @@
 import org.openqa.selenium.chrome.ChromeDriver;
 import javax.swing.*;
 
-public class Main extends JFrame {
+public class Main extends JFrame { //972556685096
     public Main() {
         this.setVisible(true);
         this.setSize(Constants.WINDOW_WIDTH, Constants.WINDOW_HEIGHT);
@@ -17,7 +17,7 @@ public class Main extends JFrame {
     }
 
     public static void main(String[] args) {
-        Main main = new Main();
+        new Main();
 
 
 

@@ -1,19 +1,28 @@
 import org.openqa.selenium.By;
+import org.openqa.selenium.Keys;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
-
+import java.time.Duration;
+import java.util.List;
 import javax.swing.*;
+
 
 public class MainContent extends JPanel {
     private JButton openWW;
     private JTextField phoneNum;
     private JTextField textData;
     private JLabel errorMsg;
-
+    JLabel displayCurrentMessage;
 
     public MainContent() {
-        this.setBounds(0,0,Constants.WINDOW_WIDTH, Constants.WINDOW_HEIGHT);
+        this.setLayout(null);
+        this.displayCurrentMessage = new JLabel("");
+        displayCurrentMessage.setBounds(Constants.DISPLAY_MSG_X, Constants.DISPLAY_MSG_Y,
+                Constants.DISPLAY_MSG_WIDTH, Constants.DISPLAY_MSG_HEIGHT);
+        this.add(displayCurrentMessage);
+        displayCurrentMessage.setVisible(false);
+        this.setBounds(Constants.ZERO, Constants.ZERO, Constants.WINDOW_WIDTH, Constants.WINDOW_HEIGHT);
         this.setDoubleBuffered(true);
 
         this.openWW = new JButton("Open WhatsApp Web");
@@ -41,7 +50,7 @@ public class MainContent extends JPanel {
         this.add(this.textData);
 
         this.errorMsg = new JLabel("");
-        this.errorMsg.setBounds(Constants.LOGIN_X, Constants.ERROR_Y, Constants.LOGIN_WIDTH, Constants.LOGIN_HEIGHT);
+        this.errorMsg.setBounds(Constants.DISPLAY_MSG_X, Constants.ERROR_Y, Constants.DISPLAY_MSG_WIDTH, Constants.DISPLAY_MSG_HEIGHT);
 
         repaint();
         this.openWW.addActionListener((e) -> {
@@ -50,18 +59,31 @@ public class MainContent extends JPanel {
             String textBody = textData.getText();
             if (phoneNumber.equals("")) {
                 this.errorMsg.setText("No phone number provided");
-            } else if ((phoneNumber.charAt(0) != '9' || phoneNumber.charAt(1) != '7' || phoneNumber.charAt(2) != '2') ||
-                    phoneNumber.length() != 12) {
+            } else if ((phoneNumber.charAt(Constants.ZERO) != '9' || phoneNumber.charAt(Constants.ONE)
+                    != '7' || phoneNumber.charAt(Constants.TWO) != '2') ||
+                    phoneNumber.length() != Constants.PHONE_NUM_LENGTH) {
                 this.errorMsg.setText("Phone number invalid");
             } else if (textBody.equals("")) {
                 this.errorMsg.setText("No text body provided");
             } else {
                 System.setProperty("webdriver.chrome.driver", "D:\\IntelliJ IDEA Community Edition 2021.2.3\\chromedriver.exe");
                 ChromeDriver driver = new ChromeDriver();
+                driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(Constants.SLEEP_1));
                 driver.get("https://web.whatsapp.com/");
                 loginProcess(driver);
-                String link = "https://api.whatsapp.com/send?phone=".concat(phoneNumber);
+                String link = "https://web.whatsapp.com/send?phone=".concat(phoneNumber);
                 driver.get(link);
+                WebElement typingBox = driver.findElement(By.xpath("//*[@id=\"main\"]/footer/div[1]/div/span[2]/div/div[2]/div[1]/div/div[2]"));
+                typingBox.sendKeys(textBody);
+                typingBox.sendKeys(Keys.RETURN);
+                this.displayCurrentMessage.setText("message sent successfully");
+
+                List<WebElement> messages = driver.findElements(By.className("_1beEj"));
+                WebElement lastMsg = messages.get(messages.size() - Constants.ONE);
+                messageStatus(lastMsg);
+
+                stageSix(driver, textBody);
+
             }
             this.add(this.errorMsg);
             repaint();
@@ -69,23 +91,64 @@ public class MainContent extends JPanel {
     }
 
 
-    public void loginProcess(ChromeDriver driver) {
-        JLabel login = new JLabel("Logged in successfully");
-        login.setBounds(Constants.LOGIN_X, Constants.LOGIN_Y, Constants.LOGIN_WIDTH, Constants.LOGIN_HEIGHT);
-        login.setVisible(false);
-        this.add(login);
+    public void stageSix(ChromeDriver driver, String sentMsg) {
+        new Thread(() -> {
+            try {
+                Thread.sleep(Constants.SLEEP_2);
+                String msgData = "";
+                do {
+                    List<WebElement> receivedMsg = driver.findElements(By.className("i0jNr"));
+                    WebElement lastMsg = receivedMsg.get(receivedMsg.size() - Constants.ONE);
+                    WebElement spanTag = lastMsg.findElement(By.tagName("span"));
+                    msgData = spanTag.getText();
+                } while (msgData.equals(sentMsg));
+                this.displayCurrentMessage.setText(msgData);
+                if (this.displayCurrentMessage.getText().equals(msgData)) {
+                    driver.close();
+                }
 
-        while (!login.isVisible()) {
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+
+        }).start();
+    }
+
+
+    private void messageStatus(WebElement lastMsg) {
+        new Thread(() -> {
+            String status = null;
+            try {
+                do {
+                    WebElement msgStatus = lastMsg.findElement(By.cssSelector("span[data-testid='msg-dblcheck']"));
+                    status = msgStatus.getAttribute("aria-label");
+                    if (!status.equals(" Delivered ") && !status.equals(" Read ")) {
+                        this.displayCurrentMessage.setText(" Pending ");
+                    } else {
+                        this.displayCurrentMessage.setText(status);
+                    }
+                } while (!status.equals(" Read "));
+                System.out.println("read");
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        }).start();
+    }
+
+
+    public void loginProcess(ChromeDriver driver) {
+        this.displayCurrentMessage.setText("Logged in successfully");
+
+        while (!this.displayCurrentMessage.isVisible()) {
             try {
                 WebElement element = driver.findElement(By.linkText("Get it here"));
                 if (element.isDisplayed()) {
-                    login.setVisible(true);
+                    this.displayCurrentMessage.setVisible(true);
                     this.openWW.setVisible(false);
                 }
             } catch (NoSuchElementException exception) {
             }
         }
     }
-
 
 }
